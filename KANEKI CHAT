@@ -1,4 +1,4 @@
--- Global & PVT Cross-Server Chat System (Fixed Double Send & Sync Stop Bug)
+-- Global & PVT Chat System (Fixed Duplicate & Freeze Issue)
 local Players = game:GetService("Players")
 local TextChatService = game:GetService("TextChatService")
 local StarterGui = game:GetService("StarterGui")
@@ -19,12 +19,11 @@ end
 
 local SelectedPrivateUser = nil
 local ActiveUsersList = {}
-local ProcessedMessages = {} -- Duplicate messages block karne ke liye
-local LastSendTick = 0
+local ProcessedMessages = {} -- Duplicate rokne ke liye memory cache
 
--- Main Screen UI Setup
+-- Main Screen UI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GlobalChatUI_FinalFix"
+ScreenGui.Name = "GlobalChatUI_Stable"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
@@ -130,7 +129,7 @@ UIListLayout.Parent = ScrollList
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 4)
 
--- Display Message Function
+-- Display Chat Function
 local function DisplayChatMessage(sender, message, isPrivate)
 	local prefix = isPrivate and ("[PVT] " .. sender .. ": ") or ("[" .. sender .. "]: ")
 	local purpleTextFormatted = "<font color='#C864FF' size='13'>" .. message .. "</font>"
@@ -155,7 +154,7 @@ local function DisplayChatMessage(sender, message, isPrivate)
 		end
 	end)
 
-	-- Head Bubble Chat
+	-- Official Head Bubble Chat
 	local targetPlayer = Players:FindFirstChild(sender)
 	if targetPlayer and targetPlayer.Character then
 		local head = targetPlayer.Character:FindFirstChild("Head") or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -207,23 +206,19 @@ TargetTag.MouseButton1Click:Connect(function()
 	TargetTag.Visible = false
 end)
 
--- Broadcast Message (Anti-Double Send Protection)
+-- Send Broadcast with Unique ID
 local function BroadcastMessage(text)
-	if tick() - LastSendTick < 1 then return end -- 1 second cooldown
-	LastSendTick = tick()
-
 	local uniqueId = LocalPlayer.Name .. "_" .. tick() .. "_" .. math.random(100, 999)
+	
 	local payload = {
-		Id = uniqueId,
+		ID = uniqueId,
 		Sender = LocalPlayer.Name,
 		Message = text,
 		Target = SelectedPrivateUser
 	}
 
-	-- Add to processed list so it doesn't trigger itself
+	-- Locally show once
 	ProcessedMessages[uniqueId] = true
-
-	-- Display locally once
 	DisplayChatMessage(LocalPlayer.Name, text, SelectedPrivateUser ~= nil)
 
 	task.spawn(function()
@@ -254,14 +249,23 @@ end
 TextBox.FocusLost:Connect(function(enter) if enter then OnSubmit() end end)
 SendButton.MouseButton1Click:Connect(OnSubmit)
 
--- Reliable Background Sync Engine (No Loop Stop)
+-- Fixed Background Polling Loop (No Freezing / No Duplication)
 task.spawn(function()
-	while task.wait(1.5) do
+	while true do
+		task.wait(1.2)
 		pcall(function()
 			local res = CustomRequest({
-				Url = Channel_URL .. "/json?poll=1",
+				Url = Channel_URL + "/json", -- fetch latest stream cleanly
 				Method = "GET"
 			})
+			
+			-- Alternative direct poll fallback if above fails
+			if not res or not res.Body then
+				res = CustomRequest({
+					Url = Channel_URL .. "/json",
+					Method = "GET"
+				})
+			end
 
 			if res and res.Body then
 				local lines = string.split(res.Body, "\n")
@@ -270,11 +274,13 @@ task.spawn(function()
 						local s1, data = pcall(function() return HttpService:JSONDecode(line) end)
 						if s1 and data and data.message then
 							local s2, msg = pcall(function() return HttpService:JSONDecode(data.message) end)
-							if s2 and msg and msg.Sender and msg.Id then
+							if s2 and msg and msg.Sender and msg.Message then
 								
-								-- Check if message already processed (Fixes double send & freeze)
-								if not ProcessedMessages[msg.Id] then
-									ProcessedMessages[msg.Id] = true
+								local msgID = msg.ID or (msg.Sender .. "_" .. msg.Message)
+								
+								-- Check if message already handled
+								if not ProcessedMessages[msgID] then
+									ProcessedMessages[msgID] = true
 									ActiveUsersList[msg.Sender] = tick()
 
 									if msg.Sender ~= LocalPlayer.Name then
