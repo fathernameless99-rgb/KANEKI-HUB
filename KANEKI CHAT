@@ -1,4 +1,4 @@
--- Global & PVT Chat System (Fixed Duplicate & Freeze Issue)
+-- Delta Executor Guaranteed Responsive Chat System
 local Players = game:GetService("Players")
 local TextChatService = game:GetService("TextChatService")
 local StarterGui = game:GetService("StarterGui")
@@ -7,23 +7,31 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-local Channel_URL = "https://ntfy.sh/roblox_global_script_chat_room_520"
+local API_URL = "https://roblox-global-chat-default-rtdb.firebaseio.com/messages.json"
 
+-- Universal Request Function with Error Catching
 local function CustomRequest(options)
 	local reqFunc = (http_request or request or (syn and syn.request) or (Fluxus and Fluxus.request) or (http and http.request))
 	if reqFunc then
-		return reqFunc(options)
+		local success, response = pcall(function()
+			return reqFunc(options)
+		end)
+		if success then
+			return response
+		else
+			warn("HTTP Request Error: ", response)
+		end
 	end
 	return nil
 end
 
 local SelectedPrivateUser = nil
 local ActiveUsersList = {}
-local ProcessedMessages = {} -- Duplicate rokne ke liye memory cache
+local ProcessedMessages = {}
 
--- Main Screen UI
+-- UI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GlobalChatUI_Stable"
+ScreenGui.Name = "GlobalChatUI_FinalFix"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
@@ -135,7 +143,6 @@ local function DisplayChatMessage(sender, message, isPrivate)
 	local purpleTextFormatted = "<font color='#C864FF' size='13'>" .. message .. "</font>"
 	local fullFormatted = "<font color='#FFFFFF'>" .. prefix .. "</font>" .. purpleTextFormatted
 
-	-- Chat Box Display
 	pcall(function()
 		StarterGui:SetCore("ChatMakeSystemMessage", {
 			Text = prefix .. message,
@@ -154,7 +161,6 @@ local function DisplayChatMessage(sender, message, isPrivate)
 		end
 	end)
 
-	-- Official Head Bubble Chat
 	local targetPlayer = Players:FindFirstChild(sender)
 	if targetPlayer and targetPlayer.Character then
 		local head = targetPlayer.Character:FindFirstChild("Head") or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -166,7 +172,7 @@ local function DisplayChatMessage(sender, message, isPrivate)
 	end
 end
 
--- Refresh User Menu
+-- Refresh User List
 local function RefreshUserMenu()
 	for _, child in ipairs(ScrollList:GetChildren()) do
 		if child:IsA("TextButton") then child:Destroy() end
@@ -206,24 +212,21 @@ TargetTag.MouseButton1Click:Connect(function()
 	TargetTag.Visible = false
 end)
 
--- Send Broadcast with Unique ID
+-- Broadcast Message (Guaranteed Local Echo + API Send)
 local function BroadcastMessage(text)
-	local uniqueId = LocalPlayer.Name .. "_" .. tick() .. "_" .. math.random(100, 999)
-	
 	local payload = {
-		ID = uniqueId,
 		Sender = LocalPlayer.Name,
 		Message = text,
-		Target = SelectedPrivateUser
+		Target = SelectedPrivateUser or "",
+		Time = tick()
 	}
 
-	-- Locally show once
-	ProcessedMessages[uniqueId] = true
+	-- Hamesha apna message turant screen par dikhayega (Bina API wait kiye)
 	DisplayChatMessage(LocalPlayer.Name, text, SelectedPrivateUser ~= nil)
 
 	task.spawn(function()
 		CustomRequest({
-			Url = Channel_URL,
+			Url = API_URL,
 			Method = "POST",
 			Headers = { ["Content-Type"] = "application/json" },
 			Body = HttpService:JSONEncode(payload)
@@ -249,51 +252,35 @@ end
 TextBox.FocusLost:Connect(function(enter) if enter then OnSubmit() end end)
 SendButton.MouseButton1Click:Connect(OnSubmit)
 
--- Fixed Background Polling Loop (No Freezing / No Duplication)
+-- Background Listener Loop
 task.spawn(function()
 	while true do
-		task.wait(1.2)
+		task.wait(1.5)
 		pcall(function()
 			local res = CustomRequest({
-				Url = Channel_URL + "/json", -- fetch latest stream cleanly
+				Url = API_URL,
 				Method = "GET"
 			})
-			
-			-- Alternative direct poll fallback if above fails
-			if not res or not res.Body then
-				res = CustomRequest({
-					Url = Channel_URL .. "/json",
-					Method = "GET"
-				})
-			end
 
 			if res and res.Body then
-				local lines = string.split(res.Body, "\n")
-				for _, line in ipairs(lines) do
-					if line ~= "" then
-						local s1, data = pcall(function() return HttpService:JSONDecode(line) end)
-						if s1 and data and data.message then
-							local s2, msg = pcall(function() return HttpService:JSONDecode(data.message) end)
-							if s2 and msg and msg.Sender and msg.Message then
-								
-								local msgID = msg.ID or (msg.Sender .. "_" .. msg.Message)
-								
-								-- Check if message already handled
-								if not ProcessedMessages[msgID] then
-									ProcessedMessages[msgID] = true
-									ActiveUsersList[msg.Sender] = tick()
+				local data = HttpService:JSONDecode(res.Body)
+				if data and type(data) == "table" then
+					for key, msgData in pairs(data) do
+						if not ProcessedMessages[key] then
+							ProcessedMessages[key] = true
+							
+							if msgData.Sender and msgData.Sender ~= LocalPlayer.Name then
+								ActiveUsersList[msgData.Sender] = tick()
 
-									if msg.Sender ~= LocalPlayer.Name then
-										local isForMe = (msg.Target == LocalPlayer.Name)
+								local isPrivate = (msgData.Target and msgData.Target ~= "")
+								local isForMe = (msgData.Target == LocalPlayer.Name)
 
-										if msg.Target then
-											if isForMe then
-												DisplayChatMessage(msg.Sender, msg.Message, true)
-											end
-										else
-											DisplayChatMessage(msg.Sender, msg.Message, false)
-										end
+								if isPrivate then
+									if isForMe then
+										DisplayChatMessage(msgData.Sender, msgData.Message, true)
 									end
+								else
+									DisplayChatMessage(msgData.Sender, msgData.Message, false)
 								end
 							end
 						end
