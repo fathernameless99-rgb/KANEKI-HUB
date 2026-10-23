@@ -1,4 +1,4 @@
--- Delta Executor Green Theme Cross-Server Chat (MessagingService)
+-- Delta Executor Purple Theme Cross-Server Global & PVT Chat
 local Players = game:GetService("Players")
 local MessagingService = game:GetService("MessagingService")
 local TextChatService = game:GetService("TextChatService")
@@ -7,14 +7,14 @@ local ChatService = game:GetService("Chat")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-local TOPIC_NAME = "GlobalScriptChatRoom_GreenTheme_520"
+local TOPIC_NAME = "GlobalScriptChatRoom_NewsSmithRP_Purple_520"
 
 local SelectedPrivateUser = nil
 local ActiveUsersList = {}
 
--- Main Screen UI (Green Theme)
+-- Main Screen UI (Purple Theme)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GlobalChatUI_GreenTheme"
+ScreenGui.Name = "GlobalChatUI_PurpleTheme"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
@@ -22,7 +22,7 @@ local Frame = Instance.new("Frame")
 Frame.Name = "ChatBarFrame"
 Frame.Size = UDim2.new(0, 230, 0, 34)
 Frame.Position = UDim2.new(0, 15, 1, -50)
-Frame.BackgroundColor3 = Color3.fromRGB(10, 20, 15)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 10, 25)
 Frame.BackgroundTransparency = 0.35
 Frame.BorderSizePixel = 0
 Frame.Parent = ScreenGui
@@ -31,9 +31,9 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = Frame
 
--- Neon Green Border Theme
+-- Bright Neon Purple Border
 local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(30, 255, 100)
+UIStroke.Color = Color3.fromRGB(180, 40, 220)
 UIStroke.Thickness = 1.5
 UIStroke.Parent = Frame
 
@@ -44,7 +44,7 @@ TextBox.Position = UDim2.new(0, 8, 0, 3)
 TextBox.BackgroundTransparency = 1
 TextBox.Font = Enum.Font.GothamMedium
 TextBox.PlaceholderText = "Type or 'PVT'..."
-TextBox.PlaceholderColor3 = Color3.fromRGB(150, 255, 180)
+TextBox.PlaceholderColor3 = Color3.fromRGB(180, 140, 200)
 TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 TextBox.TextSize = 11
 TextBox.TextXAlignment = Enum.TextXAlignment.Left
@@ -55,7 +55,7 @@ local SendButton = Instance.new("TextButton")
 SendButton.Name = "SendBtn"
 SendButton.Size = UDim2.new(0, 26, 0, 26)
 SendButton.Position = UDim2.new(1, -30, 0, 4)
-SendButton.BackgroundColor3 = Color3.fromRGB(20, 200, 80) -- Green Send Button
+SendButton.BackgroundColor3 = Color3.fromRGB(140, 20, 180) -- Purple Send Button
 SendButton.Text = "➤"
 SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SendButton.Font = Enum.Font.GothamBold
@@ -70,7 +70,7 @@ local TargetTag = Instance.new("TextButton")
 TargetTag.Name = "TargetTag"
 TargetTag.Size = UDim2.new(0, 90, 0, 20)
 TargetTag.Position = UDim2.new(0, 0, 0, -25)
-TargetTag.BackgroundColor3 = Color3.fromRGB(20, 150, 60)
+TargetTag.BackgroundColor3 = Color3.fromRGB(140, 20, 180)
 TargetTag.TextColor3 = Color3.fromRGB(255, 255, 255)
 TargetTag.Font = Enum.Font.GothamBold
 TargetTag.TextSize = 10
@@ -85,7 +85,7 @@ local UserMenu = Instance.new("Frame")
 UserMenu.Name = "UserMenu"
 UserMenu.Size = UDim2.new(0, 190, 0, 130)
 UserMenu.Position = UDim2.new(0, 15, 1, -190)
-UserMenu.BackgroundColor3 = Color3.fromRGB(10, 20, 15)
+UserMenu.BackgroundColor3 = Color3.fromRGB(20, 10, 25)
 UserMenu.BackgroundTransparency = 0.2
 UserMenu.Visible = false
 UserMenu.Parent = ScreenGui
@@ -95,7 +95,7 @@ MenuCorner.CornerRadius = UDim.new(0, 8)
 MenuCorner.Parent = UserMenu
 
 local MenuStroke = Instance.new("UIStroke")
-MenuStroke.Color = Color3.fromRGB(30, 255, 100)
+MenuStroke.Color = Color3.fromRGB(180, 40, 220)
 MenuStroke.Thickness = 1.5
 MenuStroke.Parent = UserMenu
 
@@ -103,7 +103,7 @@ local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, 0, 0, 22)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Text = "Select User for PVT Chat"
-TitleLabel.TextColor3 = Color3.fromRGB(120, 255, 160)
+TitleLabel.TextColor3 = Color3.fromRGB(255, 120, 220)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 10
 TitleLabel.Parent = UserMenu
@@ -165,7 +165,7 @@ local function RefreshUserMenu()
 			count = count + 1
 			local UserBtn = Instance.new("TextButton")
 			UserBtn.Size = UDim2.new(1, -5, 0, 20)
-			UserBtn.BackgroundColor3 = Color3.fromRGB(15, 50, 30)
+			UserBtn.BackgroundColor3 = Color3.fromRGB(50, 20, 70)
 			UserBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			UserBtn.Font = Enum.Font.GothamMedium
 			UserBtn.TextSize = 10
@@ -193,7 +193,7 @@ TargetTag.MouseButton1Click:Connect(function()
 	TargetTag.Visible = false
 end)
 
--- Publish via MessagingService
+-- Publish Message
 local function BroadcastMessage(text)
 	local payload = {
 		Sender = LocalPlayer.Name,
@@ -219,6 +219,7 @@ local function OnSubmit()
 		return
 	end
 
+	ActiveUsersList[LocalPlayer.Name] = tick()
 	TextBox.Text = ""
 	BroadcastMessage(text)
 end
@@ -226,22 +227,24 @@ end
 TextBox.FocusLost:Connect(function(enter) if enter then OnSubmit() end end)
 SendButton.MouseButton1Click:Connect(OnSubmit)
 
--- Subscribe to MessagingService
+-- Subscribe Messaging Service
 pcall(function()
 	MessagingService:SubscribeAsync(TOPIC_NAME, function(connectionData)
 		local data = connectionData.Data
-		if data and data.Sender and data.Sender ~= LocalPlayer.Name then
+		if data and data.Sender then
 			ActiveUsersList[data.Sender] = tick()
+			
+			if data.Sender ~= LocalPlayer.Name then
+				local isPrivate = (data.Target and data.Target ~= "")
+				local isForMe = (data.Target == LocalPlayer.Name)
 
-			local isPrivate = (data.Target and data.Target ~= "")
-			local isForMe = (data.Target == LocalPlayer.Name)
-
-			if isPrivate then
-				if isForMe then
-					DisplayChatMessage(data.Sender, data.Message, true)
+				if isPrivate then
+					if isForMe then
+						DisplayChatMessage(data.Sender, data.Message, true)
+					end
+				else
+					DisplayChatMessage(data.Sender, data.Message, false)
 				end
-			else
-				DisplayChatMessage(data.Sender, data.Message, false)
 			end
 		end
 	end)
