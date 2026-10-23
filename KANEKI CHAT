@@ -1,4 +1,4 @@
--- Global Cross-Server Chat with Random User Colors
+-- Delta Executor Red Theme Chat System
 local Players = game:GetService("Players")
 local TextChatService = game:GetService("TextChatService")
 local StarterGui = game:GetService("StarterGui")
@@ -7,14 +7,7 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-
--- Public High-Speed Relay API Endpoint for Cross-Server Sync
 local CHANNEL_ENDPOINT = "https://ntfy.sh/roblox_global_script_chat_room_520_v2"
-
--- Har user ke liye ek unique random neon color generate karna
-math.randomseed(LocalPlayer.UserId + tick())
-local RandomUserColor = Color3.fromHSV(math.random(), 0.8, 1)
-local ColorHex = string.format("#%02X%02X%02X", RandomUserColor.R * 255, RandomUserColor.G * 255, RandomUserColor.B * 255)
 
 local function CustomRequest(options)
 	local reqFunc = (http_request or request or (syn and syn.request) or (Fluxus and Fluxus.request) or (http and http.request))
@@ -29,9 +22,9 @@ local SelectedPrivateUser = nil
 local ActiveUsersList = {}
 local ProcessedMessages = {}
 
--- UI Setup (Left-Bottom Chat Bar)
+-- UI Setup (Left-Bottom Chat Bar with Red Theme)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GlobalChatUI_RandomColor"
+ScreenGui.Name = "GlobalChatUI_RedTheme"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
@@ -39,7 +32,7 @@ local Frame = Instance.new("Frame")
 Frame.Name = "ChatBarFrame"
 Frame.Size = UDim2.new(0, 230, 0, 34)
 Frame.Position = UDim2.new(0, 15, 1, -50)
-Frame.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 10, 10) -- Dark Reddish BG
 Frame.BackgroundTransparency = 0.35
 Frame.BorderSizePixel = 0
 Frame.Parent = ScreenGui
@@ -48,8 +41,9 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = Frame
 
+-- Pure Red Border Theme
 local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(180, 40, 220)
+UIStroke.Color = Color3.fromRGB(255, 30, 30) -- Bright Red
 UIStroke.Thickness = 1.5
 UIStroke.Parent = Frame
 
@@ -60,7 +54,7 @@ TextBox.Position = UDim2.new(0, 8, 0, 3)
 TextBox.BackgroundTransparency = 1
 TextBox.Font = Enum.Font.GothamMedium
 TextBox.PlaceholderText = "Type or 'PVT'..."
-TextBox.PlaceholderColor3 = Color3.fromRGB(180, 140, 200)
+TextBox.PlaceholderColor3 = Color3.fromRGB(255, 150, 150)
 TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 TextBox.TextSize = 11
 TextBox.TextXAlignment = Enum.TextXAlignment.Left
@@ -71,7 +65,7 @@ local SendButton = Instance.new("TextButton")
 SendButton.Name = "SendBtn"
 SendButton.Size = UDim2.new(0, 26, 0, 26)
 SendButton.Position = UDim2.new(1, -30, 0, 4)
-SendButton.BackgroundColor3 = Color3.fromRGB(140, 20, 180)
+SendButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20) -- Red Send Button
 SendButton.Text = "➤"
 SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SendButton.Font = Enum.Font.GothamBold
@@ -86,7 +80,7 @@ local TargetTag = Instance.new("TextButton")
 TargetTag.Name = "TargetTag"
 TargetTag.Size = UDim2.new(0, 90, 0, 20)
 TargetTag.Position = UDim2.new(0, 0, 0, -25)
-TargetTag.BackgroundColor3 = Color3.fromRGB(160, 20, 90)
+TargetTag.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
 TargetTag.TextColor3 = Color3.fromRGB(255, 255, 255)
 TargetTag.Font = Enum.Font.GothamBold
 TargetTag.TextSize = 10
@@ -101,7 +95,7 @@ local UserMenu = Instance.new("Frame")
 UserMenu.Name = "UserMenu"
 UserMenu.Size = UDim2.new(0, 190, 0, 130)
 UserMenu.Position = UDim2.new(0, 15, 1, -190)
-UserMenu.BackgroundColor3 = Color3.fromRGB(20, 10, 25)
+UserMenu.BackgroundColor3 = Color3.fromRGB(20, 10, 10)
 UserMenu.BackgroundTransparency = 0.2
 UserMenu.Visible = false
 UserMenu.Parent = ScreenGui
@@ -111,7 +105,7 @@ MenuCorner.CornerRadius = UDim.new(0, 8)
 MenuCorner.Parent = UserMenu
 
 local MenuStroke = Instance.new("UIStroke")
-MenuStroke.Color = Color3.fromRGB(220, 30, 100)
+MenuStroke.Color = Color3.fromRGB(255, 30, 30)
 MenuStroke.Thickness = 1.5
 MenuStroke.Parent = UserMenu
 
@@ -119,7 +113,7 @@ local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, 0, 0, 22)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Text = "Select User for PVT Chat"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 120, 220)
+TitleLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 10
 TitleLabel.Parent = UserMenu
@@ -137,17 +131,15 @@ UIListLayout.Parent = ScrollList
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 4)
 
--- Display Message Function (Random Name Color + Purple Message Text)
-local function DisplayChatMessage(sender, message, senderColorHex, isPrivate)
+-- Display Chat Function (White Name, Small Purple Message Text)
+local function DisplayChatMessage(sender, message, isPrivate)
 	local prefix = isPrivate and ("[PVT] " .. sender .. ": ") or ("[" .. sender .. "]: ")
-	local nameColor = senderColorHex or "#FFFFFF"
-	
-	local formattedMsg = "<font color='" .. nameColor .. "'>" .. prefix .. "</font><font color='#C864FF' size='13'>" .. message .. "</font>"
+	local formattedMsg = "<font color='#FFFFFF'>" .. prefix .. "</font><font color='#C864FF' size='13'>" .. message .. "</font>"
 
 	pcall(function()
 		StarterGui:SetCore("ChatMakeSystemMessage", {
 			Text = prefix .. message,
-			Color = Color3.fromRGB(200, 100, 255),
+			Color = Color3.fromRGB(255, 255, 255),
 			Font = Enum.Font.SourceSansMedium,
 			TextSize = 14
 		})
@@ -183,7 +175,7 @@ local function RefreshUserMenu()
 			count = count + 1
 			local UserBtn = Instance.new("TextButton")
 			UserBtn.Size = UDim2.new(1, -5, 0, 20)
-			UserBtn.BackgroundColor3 = Color3.fromRGB(50, 20, 70)
+			UserBtn.BackgroundColor3 = Color3.fromRGB(60, 15, 15)
 			UserBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			UserBtn.Font = Enum.Font.GothamMedium
 			UserBtn.TextSize = 10
@@ -217,11 +209,10 @@ local function BroadcastMessage(text)
 		ID = LocalPlayer.Name .. "_" .. tick(),
 		Sender = LocalPlayer.Name,
 		Message = text,
-		Target = SelectedPrivateUser or "",
-		ColorHex = ColorHex
+		Target = SelectedPrivateUser or ""
 	}
 
-	DisplayChatMessage(LocalPlayer.Name, text, ColorHex, SelectedPrivateUser ~= nil)
+	DisplayChatMessage(LocalPlayer.Name, text, SelectedPrivateUser ~= nil)
 
 	task.spawn(function()
 		CustomRequest({
@@ -283,10 +274,10 @@ task.spawn(function()
 
 										if isPrivate then
 											if isForMe then
-												DisplayChatMessage(msg.Sender, msg.Message, msg.ColorHex or "#FFFFFF", true)
+												DisplayChatMessage(msg.Sender, msg.Message, true)
 											end
 										else
-											DisplayChatMessage(msg.Sender, msg.Message, msg.ColorHex or "#FFFFFF", false)
+											DisplayChatMessage(msg.Sender, msg.Message, false)
 										end
 									end
 								end
