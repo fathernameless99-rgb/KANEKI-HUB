@@ -1,0 +1,362 @@
+-- Global & PVT Chat System (Fixed Double Msg, Colorful Names, Rainbow Join Notification)
+local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
+local StarterGui = game:GetService("StarterGui")
+local ChatService = game:GetService("Chat")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Channel_URL = "https://ntfy.sh/roblox_global_script_chat_room_520"
+
+local function CustomRequest(options)
+	local reqFunc = (http_request or request or (syn and syn.request) or (Fluxus and Fluxus.request) or (http and http.request))
+	if reqFunc then return reqFunc(options) end
+	return nil
+end
+
+local SelectedPrivateUser = nil
+local ActiveUsersList = {}
+local NotifiedUsers = {} -- Duplicate join notification rokne ke liye
+
+-- Rainbow Color Generator for Usernames
+local function GetRainbowHex()
+	local tickVal = tick() * 2
+	local r = math.floor(math.sin(tickVal) * 127 + 128)
+	local g = math.floor(math.sin(tickVal + 2) * 127 + 128)
+	local b = math.floor(math.sin(tickVal + 4) * 127 + 128)
+	return string.format("#%02X%02X%02X", r, g, b)
+end
+
+-- Consistent Random Color for each User (Taki har bande ka naam alag color ka ho)
+local function GetUserColor(name)
+	local hash = 0
+	for i = 1, #name do
+		hash = string.byte(name, i) + (hash * 31)
+	end
+	local colors = {"#FF5733", "#33FF57", "#3357FF", "#F3FF33", "#FF33F3", "#33FFF0", "#FFA533", "#A533FF"}
+	return colors[(math.abs(hash) % #colors) + 1]
+end
+
+-- Main UI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GlobalChatUI_FinalFix"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame")
+Frame.Name = "ChatBarFrame"
+Frame.Size = UDim2.new(0, 230, 0, 34)
+Frame.Position = UDim2.new(0, 15, 1, -50)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+Frame.BackgroundTransparency = 0.35
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = Frame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(180, 40, 220)
+UIStroke.Thickness = 1.5
+UIStroke.Parent = Frame
+
+local TextBox = Instance.new("TextBox")
+TextBox.Name = "ChatInput"
+TextBox.Size = UDim2.new(1, -70, 1, -6)
+TextBox.Position = UDim2.new(0, 8, 0, 3)
+TextBox.BackgroundTransparency = 1
+TextBox.Font = Enum.Font.GothamMedium
+TextBox.PlaceholderText = "Type or 'PVT'..."
+TextBox.PlaceholderColor3 = Color3.fromRGB(180, 140, 200)
+TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextBox.TextSize = 11
+TextBox.TextXAlignment = Enum.TextXAlignment.Left
+TextBox.ClearTextOnFocus = false
+TextBox.Parent = Frame
+
+local SendButton = Instance.new("TextButton")
+SendButton.Name = "SendBtn"
+SendButton.Size = UDim2.new(0, 26, 0, 26)
+SendButton.Position = UDim2.new(1, -30, 0, 4)
+SendButton.BackgroundColor3 = Color3.fromRGB(140, 20, 180)
+SendButton.Text = "➤"
+SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SendButton.Font = Enum.Font.GothamBold
+SendButton.TextSize = 11
+SendButton.Parent = Frame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = SendButton
+
+local TargetTag = Instance.new("TextButton")
+TargetTag.Name = "TargetTag"
+TargetTag.Size = UDim2.new(0, 90, 0, 20)
+TargetTag.Position = UDim2.new(0, 0, 0, -25)
+TargetTag.BackgroundColor3 = Color3.fromRGB(160, 20, 90)
+TargetTag.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetTag.Font = Enum.Font.GothamBold
+TargetTag.TextSize = 10
+TargetTag.Visible = false
+TargetTag.Parent = Frame
+
+local TagCorner = Instance.new("UICorner")
+TagCorner.CornerRadius = UDim.new(0, 5)
+TagCorner.Parent = TargetTag
+
+local UserMenu = Instance.new("Frame")
+UserMenu.Name = "UserMenu"
+UserMenu.Size = UDim2.new(0, 190, 0, 130)
+UserMenu.Position = UDim2.new(0, 15, 1, -190)
+UserMenu.BackgroundColor3 = Color3.fromRGB(20, 10, 25)
+UserMenu.BackgroundTransparency = 0.2
+UserMenu.Visible = false
+UserMenu.Parent = ScreenGui
+
+local MenuCorner = Instance.new("UICorner")
+MenuCorner.CornerRadius = UDim.new(0, 8)
+MenuCorner.Parent = UserMenu
+
+local MenuStroke = Instance.new("UIStroke")
+MenuStroke.Color = Color3.fromRGB(220, 30, 100)
+MenuStroke.Thickness = 1.5
+MenuStroke.Parent = UserMenu
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, 0, 0, 22)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Select User for PVT Chat"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 120, 220)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 10
+TitleLabel.Parent = UserMenu
+
+local ScrollList = Instance.new("ScrollingFrame")
+ScrollList.Size = UDim2.new(1, -10, 1, -28)
+ScrollList.Position = UDim2.new(0, 5, 0, 24)
+ScrollList.BackgroundTransparency = 1
+ScrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollList.ScrollBarThickness = 3
+ScrollList.Parent = UserMenu
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = ScrollList
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 4)
+
+-- Display Chat Function (No Double Msg + Unique Name Colors + Purple Small Text)
+local function DisplayChatMessage(sender, message, isPrivate)
+	local nameColor = GetUserColor(sender)
+	local prefix = isPrivate and ("[PVT] " .. sender .. ": ") or ("[" .. sender .. "]: ")
+	
+	-- Formatting: Name has unique color, Message is small & purple
+	local formattedMsg = "<font color='" .. nameColor .. "'>" .. prefix .. "</font><font color='#C864FF' size='13'>" .. message .. "</font>"
+
+	pcall(function()
+		StarterGui:SetCore("ChatMakeSystemMessage", {
+			Text = prefix .. message,
+			Color = Color3.fromRGB(200, 100, 255),
+			Font = Enum.Font.SourceSansMedium,
+			TextSize = 14
+		})
+	end)
+
+	pcall(function()
+		if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+			if channel then
+				channel:DisplaySystemMessage(formattedMsg)
+			end
+		end
+	end)
+
+	-- Official Head Bubble Chat
+	if not isPrivate then
+		local targetPlayer = Players:FindFirstChild(sender)
+		if targetPlayer and targetPlayer.Character then
+			local head = targetPlayer.Character:FindFirstChild("Head") or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+			if head then
+				pcall(function()
+					ChatService:Chat(head, message)
+				end)
+			end
+		end
+	end
+end
+
+-- Join Notification with Rainbow Username
+local function NotifyUserJoin(username)
+	if NotifiedUsers[username] then return end
+	NotifiedUsers[username] = true
+
+	task.spawn(function()
+		while task.wait(0.1) do
+			if not NotifiedUsers[username] then break end
+			local rainbowHex = GetRainbowHex()
+			local joinMsg = "<font color='" .. rainbowHex .. "'>[+] " .. username .. " joined the Global Script Chat!</font>"
+
+			pcall(function()
+				if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+					local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+					if channel then
+						channel:DisplaySystemMessage(joinMsg)
+					end
+				end
+			end)
+			break -- Ek baar rainbow color ke sath notification bhej kar loop break karega
+		end
+	end)
+end
+
+-- Refresh User Menu
+local function RefreshUserMenu()
+	for _, child in ipairs(ScrollList:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+
+	local count = 0
+	for userName, _ in pairs(ActiveUsersList) do
+		if userName ~= LocalPlayer.Name then
+			count = count + 1
+			local UserBtn = Instance.new("TextButton")
+			UserBtn.Size = UDim2.new(1, -5, 0, 20)
+			UserBtn.BackgroundColor3 = Color3.fromRGB(50, 20, 70)
+			UserBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			UserBtn.Font = Enum.Font.GothamMedium
+			UserBtn.TextSize = 10
+			UserBtn.Text = "  " .. userName
+			UserBtn.TextXAlignment = Enum.TextXAlignment.Left
+			UserBtn.Parent = ScrollList
+
+			local Corner = Instance.new("UICorner")
+			Corner.CornerRadius = UDim.new(0, 4)
+			Corner.Parent = UserBtn
+
+			UserBtn.MouseButton1Click:Connect(function()
+				SelectedPrivateUser = userName
+				TargetTag.Text = "PVT: " .. userName .. " [X]"
+				TargetTag.Visible = true
+				UserMenu.Visible = false
+			end)
+		end
+	end
+	ScrollList.CanvasSize = UDim2.new(0, 0, 0, count * 24)
+end
+
+TargetTag.MouseButton1Click:Connect(function()
+	SelectedPrivateUser = nil
+	TargetTag.Visible = false
+end)
+
+-- Send Broadcast (Local echo sirf ek baar hoga)
+local function BroadcastMessage(text)
+	local payload = {
+		Sender = LocalPlayer.Name,
+		Message = text,
+		Target = SelectedPrivateUser,
+		Type = "Chat"
+	}
+
+	DisplayChatMessage(LocalPlayer.Name, text, SelectedPrivateUser ~= nil)
+
+	task.spawn(function()
+		CustomRequest({
+			Url = Channel_URL,
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode(payload)
+		})
+	end)
+end
+
+-- Self Join Ping (Jaise hi script run ho, sabko pata chal jaye)
+task.spawn(function()
+	task.wait(1)
+	local payload = {
+		Sender = LocalPlayer.Name,
+		Message = "Joined",
+		Target = nil,
+		Type = "Join"
+	}
+	CustomRequest({
+		Url = Channel_URL,
+		Method = "POST",
+		Headers = { ["Content-Type"] = "application/json" },
+		Body = HttpService:JSONEncode(payload)
+	})
+end)
+
+local function OnSubmit()
+	local text = TextBox.Text
+	if text == "" or #text:gsub("%s+", "") == 0 then return end
+
+	if string.upper(text) == "PVT" then
+		TextBox.Text = ""
+		RefreshUserMenu() اپنا
+		UserMenu.Visible = not UserMenu.Visible
+		return
+	end
+
+	TextBox.Text = ""
+	BroadcastMessage(text)
+end
+
+TextBox.FocusLost:Connect(function(enter) if enter then OnSubmit() end end)
+SendButton.MouseButton1Click:Connect(OnSubmit)
+
+-- Background Sync Engine (Double message prevention check added)
+local ProcessedMessages = {}
+
+task.spawn(function()
+	local lastTimestamp = os.time()
+
+	while task.wait(1) do
+		pcall(function()
+			local res = CustomRequest({
+				Url = Channel_URL .. "/json?poll=1&since=" .. (lastTimestamp - 2),
+				Method = "GET"
+			})
+
+			if res and res.Body then
+				local lines = string.split(res.Body, "\n")
+				for _, line in ipairs(lines) do
+					if line ~= "" then
+						local s1, data = pcall(function() return HttpService:JSONDecode(line) end)
+						if s1 and data and data.id and not ProcessedMessages[data.id] then
+							ProcessedMessages[data.id] = true
+
+							local s2, msg = pcall(function() return HttpService:JSONDecode(data.message) end)
+							if s2 and msg and msg.Sender then
+								
+								ActiveUsersList[msg.Sender] = tick()
+
+								-- Join Notification Handler
+								if msg.Type == "Join" then
+									NotifyUserJoin(msg.Sender)
+								-- Chat Message Handler
+								elseif msg.Sender ~= LocalPlayer.Name then
+									NotifyUserJoin(msg.Sender) -- Agar join nahi hua to join bhi dikha dega
+									
+									local isForMe = (msg.Target == LocalPlayer.Name)
+
+									if msg.Target then
+										if isForMe then
+											DisplayChatMessage(msg.Sender, msg.Message, true)
+										end
+									else
+										if msg.Type ~= "Join" then
+											DisplayChatMessage(msg.Sender, msg.Message, false)
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+				lastTimestamp = os.time()
+			end
+		end)
+	end
+end)
